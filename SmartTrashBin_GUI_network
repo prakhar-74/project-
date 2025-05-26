@@ -1,0 +1,92 @@
+import tkinter as tk
+import socket
+import threading
+
+PORT = 9999  # Must match the sender's port
+
+# --- GUI SETUP ---
+root = tk.Tk()
+root.title("Smart Trash Bin Monitor")
+
+fill_var = tk.StringVar(value="Waiting...")
+light_var = tk.StringVar(value="")
+alert_var = tk.StringVar(value="")
+
+tk.Label(root, text="Bin Fill Level:", font=("Arial", 16)).pack()
+tk.Label(root, textvariable=fill_var, font=("Arial", 24)).pack()
+
+tk.Label(root, text="Light Level (LUX):", font=("Arial", 16)).pack()
+tk.Label(root, textvariable=light_var, font=("Arial", 18)).pack()
+
+alert_label = tk.Label(root, textvariable=alert_var, font=("Arial", 24), fg="red")
+alert_label.pack(pady=10)
+
+# --- ALERT FLICKER SETUP ---
+flicker_on = False
+def flicker_alert():
+    global flicker_on
+    if flicker_on:
+        alert_label.config(fg="red")
+        alert_var.set("⚠️ CHANGE THE BIN! ⚠️")
+        flicker_on = False
+    else:
+        alert_label.config(fg=root["bg"])
+        flicker_on = True
+    root.after(500, flicker_alert)
+
+# --- HANDLE INCOMING DATA ---
+def handle_data(data):
+    print("Handling:", data)
+    if "LID_OPEN" in data:
+        try:
+            lux = data.split("LUX:")[1]
+            light_var.set(f"{lux} lux (Opened)")
+        except:
+            pass
+    elif "LID_CLOSED" in data:
+        try:
+            parts = data.split(',')
+            fill = int(parts[1].split(":")[1])
+            lux = parts[2].split(":")[1]
+            fill_var.set(f"{fill}%")
+            light_var.set(f"{lux} lux (Closed)")
+            if fill >= 60:
+                flicker_alert()
+            else:
+                alert_var.set("")
+                alert_label.config(fg=root["bg"])
+        except:
+            pass
+
+# --- SOCKET LISTENER THREAD ---
+def server_thread():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('', PORT))
+        s.listen()
+        print(f"Waiting for laptop on port {PORT}...")
+        conn, addr = s.accept()
+        print(f"Connected by {addr}")
+        with conn:
+            buffer = ""
+            while True:
+                try:
+                    data = conn.recv(1024).decode('utf-8')
+                    if not data:
+                        break
+                    buffer += data
+                    lines = buffer.split('\n')
+                    buffer = lines[-1]  # Keep incomplete line
+                    for line in lines[:-1]:
+                        line = line.strip()
+                        if line:
+                            print("Received:", line)
+                            handle_data(line)
+                except Exception as e:
+                    print("Error:", e)
+                    break
+
+# --- START THE SERVER IN BACKGROUND ---
+threading.Thread(target=server_thread, daemon=True).start()
+
+# --- RUN THE GUI ---
+root.mainloop()
