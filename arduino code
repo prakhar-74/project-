@@ -3,7 +3,6 @@
 
 #define TRIG_PIN 5
 #define ECHO_PIN 6
-#define LED_PIN 8  // LED lights up when lid is open
 
 BH1750 lightSensor;
 
@@ -17,7 +16,7 @@ void setup() {
 
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
-  pinMode(LED_PIN, OUTPUT);
+
 
   Serial.println("Smart Trash Bin Ready (Cup Mode)");
 }
@@ -40,7 +39,7 @@ void loop() {
     binWasOpen = true;
     triggered = false;
 
-    digitalWrite(LED_PIN, HIGH);  // 💡 LED on when lid is open
+
 
     Serial.print("EVENT:LID_OPEN,LUX:");
     Serial.println(lux);
@@ -53,7 +52,6 @@ void loop() {
     int fill = map(cupHeight - distance, 0, cupHeight, 0, 100);
     fill = constrain(fill, 0, 100);
 
-    digitalWrite(LED_PIN, LOW);  // 💡 LED off when lid is closed
 
     Serial.print("EVENT:LID_CLOSED,FILL:");
     Serial.print(fill);
@@ -67,14 +65,12 @@ void loop() {
   // Reset if lid is opened again
   if (binWasOpen && lux > 20.0) {
     triggered = false;
-    digitalWrite(LED_PIN, HIGH);  // Keep LED on while lid open
   }
 
   // Lid fully closed and already triggered
   if (binWasOpen && lux < 10.0 && triggered) {
     binWasOpen = false;
     triggered = false;
-    digitalWrite(LED_PIN, LOW);  // LED off when bin is fully closed
   }
 
   delay(300);
