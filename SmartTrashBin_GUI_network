@@ -2,7 +2,7 @@ import tkinter as tk
 import socket
 import threading
 
-PORT = 9999  # Must match the sender's port
+PORT = 9999  
 
 # --- GUI SETUP ---
 root = tk.Tk()
