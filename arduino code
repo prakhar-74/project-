@@ -1,0 +1,81 @@
+#include <Wire.h>
+#include <BH1750.h>
+
+#define TRIG_PIN 5
+#define ECHO_PIN 6
+#define LED_PIN 8  // LED lights up when lid is open
+
+BH1750 lightSensor;
+
+bool binWasOpen = false;
+bool triggered = false;
+
+void setup() {
+  Serial.begin(9600);
+  Wire.begin();
+  lightSensor.begin();
+
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+  pinMode(LED_PIN, OUTPUT);
+
+  Serial.println("Smart Trash Bin Ready (Cup Mode)");
+}
+
+long readDistanceCM() {
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN, LOW);
+  long duration = pulseIn(ECHO_PIN, HIGH);
+  return duration * 0.034 / 2;
+}
+
+void loop() {
+  float lux = lightSensor.readLightLevel();
+
+  // Detect lid opened
+  if (!binWasOpen && lux > 20.0) {
+    binWasOpen = true;
+    triggered = false;
+
+    digitalWrite(LED_PIN, HIGH);  // 💡 LED on when lid is open
+
+    Serial.print("EVENT:LID_OPEN,LUX:");
+    Serial.println(lux);
+  }
+
+  // Detect lid closed → measure fill level
+  if (binWasOpen && lux < 10.0 && !triggered) {
+    long distance = readDistanceCM();
+    int cupHeight = 12;  // Adjust to match your demo cup
+    int fill = map(cupHeight - distance, 0, cupHeight, 0, 100);
+    fill = constrain(fill, 0, 100);
+
+    digitalWrite(LED_PIN, LOW);  // 💡 LED off when lid is closed
+
+    Serial.print("EVENT:LID_CLOSED,FILL:");
+    Serial.print(fill);
+    Serial.print(",LUX:");
+    Serial.println(lux);
+
+    triggered = true;
+    delay(2000);
+  }
+
+  // Reset if lid is opened again
+  if (binWasOpen && lux > 20.0) {
+    triggered = false;
+    digitalWrite(LED_PIN, HIGH);  // Keep LED on while lid open
+  }
+
+  // Lid fully closed and already triggered
+  if (binWasOpen && lux < 10.0 && triggered) {
+    binWasOpen = false;
+    triggered = false;
+    digitalWrite(LED_PIN, LOW);  // LED off when bin is fully closed
+  }
+
+  delay(300);
+}
